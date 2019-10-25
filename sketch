@@ -1,0 +1,58 @@
+// "cartosuite"
+// cmdr fraichoo oct 3305
+// IPXWING
+
+//eddb.io API: https://eddb.io/api
+
+JSONArray values;
+void setup() {
+  size(800,450); //16:9
+  background(0);
+  stroke(255,105,0,200);
+  fill(255,105,0,150);
+  strokeWeight(4);
+  
+  float scale = 10;
+  //coordinates of HIP 2453 (IPX HQ)
+  float xTarg = -110.90625;
+  float yTarg = 16.5;
+  float zTarg = -67.84375;
+  
+  //pull data from eddb:
+  //values = loadJSONArray("https://eddb.io/archive/v6/systems_populated.json");
+  
+  //alternatvely if have downladed to a local file (must be in a folder "data"): 
+  values = loadJSONArray("systems_populated.json");
+  
+  for (int i = 0; i < values.size(); i++) {
+    JSONObject sys = values.getJSONObject(i);
+    
+    String name = sys.getString("name"); //system name
+    float x = sys.getFloat("x"); //system coordinates
+    float y = sys.getFloat("y");
+    float z = sys.getFloat("z");
+    //derive distance in ly from target (HIP 2453), d:
+    float d = sqrt((x-xTarg)*(x-xTarg)+(y-yTarg)*(y-yTarg)+(z-zTarg)*(z-zTarg));
+    
+    //system population, government & economy
+    int pop = abs(sys.getInt("population"));
+    String govt = sys.get("government").toString();
+    String econ = sys.get("primary_economy").toString();
+    
+    //search radius in ly
+    if(d <= 20.0){
+      //relative coordinates
+      float xrel = x - xTarg;
+      float yrel = y - yTarg;
+      float zrel = z - zTarg;
+      //basic output & draw functions
+      //see https://processing.org/reference/ for more
+      println(name+ "|" + xrel,yrel,zrel,d,pop,govt,econ);
+      point((scale * xrel) + width/2, (scale * yrel) + height/2);
+      text(name.toLowerCase(),(scale * xrel) + width/2, (scale * yrel) + height/2);
+      stroke(255,105,0);
+      strokeWeight(1);
+      line((scale * xrel) + width/2, (scale * yrel) + height/2, width/2, height/2);
+    }
+  }
+}
