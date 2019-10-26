@@ -91,29 +91,22 @@ void draw(){
   //WASD: 119,97,115,100
   if(keyIndex == 119){
     curSys = (curSys + 1) % localSystems.size();
-    println("next system: " + (curSys + 1) +"/" + localSystems.size());
     keyIndex = -1;
     curFac = 0;
   }
-  if(keyIndex == 100){
+  if(keyIndex == 97){
     curFac = (curFac - 1) % localSystems.get(curSys).factions.presences.size();
     if(curFac <0) curFac = localSystems.get(curSys).factions.presences.size()-1;
-    println(curFac);
-    println("prev. faction");
-    keyIndex = -1;
+     keyIndex = -1;
   }
   if(keyIndex == 115){
     curSys = (curSys - 1) % localSystems.size();
     if(curSys <0) curSys = localSystems.size()-1;
-    println(curSys);
-    println("prev. system: " + (curSys + 1) +"/" + localSystems.size());
     keyIndex = -1;
     curFac = 0;
   }
   if(keyIndex == 100){
     curFac = (curFac + 1) % localSystems.get(curSys).factions.presences.size();
-    println(curFac);
-    println("next faction");
     keyIndex = -1;
   }
 }
@@ -134,10 +127,7 @@ class System{
     name = sysName; x = xPos; y = yPos; z = zPos;
   }
   void show(){
-    if(curSys == 5){
-      fill(0,255,0);
-    } else fill(50,100,255);
-
+    fill(50,100,255);
     text(name.toLowerCase(),xScreen+(0*o), yScreen+(0*o));
     text(controllingFaction.toLowerCase() + " (contr.)",xScreen+(1*o), yScreen+(1*o));
     text(government.toLowerCase(),xScreen+(1*o), yScreen+(2*o));
@@ -181,17 +171,16 @@ class FactionPresence{
   void show(float x, float y){
     fill(255,105,0);
     float o = 20; //offset
-    text("<  " +name.toLowerCase()+" ("+(curFac+1)+"/?"+") >",x+(0*o), y);
+    text("<  " +name.toLowerCase()+" ("+(curFac+1)+"/" + localSystems.get(curSys).factions.presences.size()+") >",x+(0*o)-17, y);
     int line = 1;
-    text("inf."+influence,x+(1*o), y+(line*o)); line++;
+    text("influence: "+influence,x+(1*o), y+(line*o)); line++;
     for(int i=0; i<active.size(); i++){
       if(!active.get(i).name.equals("None")){
       text(active.get(i).name.toLowerCase() +" (active)",x+(1*o), y+(line*o)); line ++;
       } else {
-        text(" no (active) states",x+(1*o), y+(line*o)); line ++;
+        text("no (active) states",x+(1*o), y+(line*o)); line ++;
       }
     }
-    text("hap."+happinessID,x+(1*o), y+(line*o)); line++;
     for(int i=0; i<pending.size(); i++){
       text(pending.get(i).name +" (pending)",x+(1*o), y+(line*o)); line ++;
     }
