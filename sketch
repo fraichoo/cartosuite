@@ -1,4 +1,4 @@
-// CARTOSUITE
+// IPXTOOL
 // cmdr fraichoo oct 3305
 // IPXWING
 
@@ -136,13 +136,13 @@ class System{
   void show(){
     if(curSys == 5){
       fill(0,255,0);
-    } else fill(255,105,0);
+    } else fill(50,100,255);
 
     text(name.toLowerCase(),xScreen+(0*o), yScreen+(0*o));
     text(controllingFaction.toLowerCase() + " (contr.)",xScreen+(1*o), yScreen+(1*o));
     text(government.toLowerCase(),xScreen+(1*o), yScreen+(2*o));
-    text(economy.toLowerCase(),xScreen+(0*o), yScreen+(3*o));
-    text("pop."+population,xScreen+(0*o), yScreen+(4*o));
+    text(economy.toLowerCase(),xScreen+(1*o), yScreen+(3*o));
+    text("pop."+population,xScreen+(1*o), yScreen+(4*o));
     factions.show(xScreen, yScreen);
   }
 }
@@ -181,23 +181,22 @@ class FactionPresence{
   void show(float x, float y){
     fill(255,105,0);
     float o = 20; //offset
-    text(name+" ("+(curFac+1)+"/?"+")",x+o, y);
+    text("<  " +name.toLowerCase()+" ("+(curFac+1)+"/?"+") >",x+(0*o), y);
     int line = 1;
-    text("inf."+influence,x+(2*o), y+(line*o)); line++;
-    //println("megalodon",active.size(),pending.size(),recovering.size());
+    text("inf."+influence,x+(1*o), y+(line*o)); line++;
     for(int i=0; i<active.size(); i++){
       if(!active.get(i).name.equals("None")){
-      text(active.get(i).name.toLowerCase() +" (active)",x+(3*o), y+(line*o)); line ++;
+      text(active.get(i).name.toLowerCase() +" (active)",x+(1*o), y+(line*o)); line ++;
       } else {
-        text(" no (active) states",x+(2*o), y+(line*o)); line ++;
+        text(" no (active) states",x+(1*o), y+(line*o)); line ++;
       }
     }
-    text("hap."+happinessID,x+(2*o), y+(line*o)); line++;
+    text("hap."+happinessID,x+(1*o), y+(line*o)); line++;
     for(int i=0; i<pending.size(); i++){
-      text(pending.get(i).name +" (pending)",x+(3*o), y+(line*o)); line ++;
+      text(pending.get(i).name +" (pending)",x+(1*o), y+(line*o)); line ++;
     }
     for(int i=0; i<recovering.size(); i++){
-      text(recovering.get(i).name +" (recovering)",x+(3*o), y+(line*o)); line ++;
+      text(recovering.get(i).name +" (recovering)",x+(1*o), y+(line*o)); line ++;
     }
   }
 }
@@ -228,8 +227,15 @@ void showMap(){
     //println(xScreen, yScreen);
     if(i == curSys){
       strokeWeight(8);
-    } else strokeWeight(4);
+      stroke(50,100,255);
+      fill(50,100,255);
+    } else {
+      strokeWeight(4);
+      stroke(255,105,0,255);
+      fill(255,105,0,255);
+    }
     point(xScreen, yScreen);
+    text(localSystems.get(i).name.toLowerCase(),xScreen+5, yScreen-5);
     strokeWeight(1);
     stroke(255,105,0,50);
     line(0.3333*width,height/2,xScreen, yScreen);
@@ -238,6 +244,7 @@ void showMap(){
   stroke(255,105,0,100);
   float xScreenl = (scale * localSystems.get(curSys).xRel) + 0.3333*width;
   float yScreenl = (scale * localSystems.get(curSys).yRel) + height/2;
+  stroke(50,100,255);
   line(xScreenl, yScreenl, xScreen-10, yScreen-5);
   fill(0,0);
   stroke(255,105,0,50);
