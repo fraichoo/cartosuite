@@ -1,10 +1,23 @@
-// "cartosuite"
+// CARTOSUITE
 // cmdr fraichoo oct 3305
 // IPXWING
 
 //eddb.io API: https://eddb.io/api
 
-JSONArray values;
+JSONArray eddb_data;
+ArrayList<System> localSystems = new ArrayList<System>();
+JSONArray factionData;
+
+float scale = 10;
+
+int curSys = 5;
+int curFac = 4;
+
+float xScreen = 550;
+float yScreen = 150;
+
+float toff = 20;
+
 void setup() {
   size(800,450); //16:9
   background(0);
@@ -12,47 +25,226 @@ void setup() {
   fill(255,105,0,150);
   strokeWeight(4);
   
-  float scale = 10;
   //coordinates of HIP 2453 (IPX HQ)
-  float xTarg = -110.90625;
-  float yTarg = 16.5;
-  float zTarg = -67.84375;
+  float xRef = -110.90625;
+  float yRef = 16.5;
+  float zRef = -67.84375;
   
   //pull data from eddb:
-  //values = loadJSONArray("https://eddb.io/archive/v6/systems_populated.json");
+  //eddb_data = loadJSONArray("https://eddb.io/archive/v6/systems_populated.json");
   
   //alternatvely if have downladed to a local file (must be in a folder "data"): 
-  values = loadJSONArray("systems_populated.json");
+  eddb_data = loadJSONArray("systems_populated.json");
+  factionData = loadJSONArray("factions.json");
   
-  for (int i = 0; i < values.size(); i++) {
-    JSONObject sys = values.getJSONObject(i);
+  for (int i = 0; i < eddb_data.size(); i++) {
+    JSONObject current = eddb_data.getJSONObject(i);
     
-    String name = sys.getString("name"); //system name
-    float x = sys.getFloat("x"); //system coordinates
-    float y = sys.getFloat("y");
-    float z = sys.getFloat("z");
+    String name = current.getString("name"); //system name
+    float x = current.getFloat("x"); //system coordinates
+    float y = current.getFloat("y");
+    float z = current.getFloat("z");
     //derive distance in ly from target (HIP 2453), d:
-    float d = sqrt((x-xTarg)*(x-xTarg)+(y-yTarg)*(y-yTarg)+(z-zTarg)*(z-zTarg));
-    
-    //system population, government & economy
-    int pop = abs(sys.getInt("population"));
-    String govt = sys.get("government").toString();
-    String econ = sys.get("primary_economy").toString();
-    
-    //search radius in ly
+    float d = sqrt((x-xRef)*(x-xRef)+(y-yRef)*(y-yRef)+(z-zRef)*(z-zRef));
+        
+    //20ly search radius
     if(d <= 20.0){
+      System sys = new System(name,x,y,z);
+      sys.d = d;
       //relative coordinates
-      float xrel = x - xTarg;
-      float yrel = y - yTarg;
-      float zrel = z - zTarg;
-      //basic output & draw functions
-      //see https://processing.org/reference/ for more
-      println(name+ "|" + xrel,yrel,zrel,d,pop,govt,econ);
-      point((scale * xrel) + width/2, (scale * yrel) + height/2);
-      text(name.toLowerCase(),(scale * xrel) + width/2, (scale * yrel) + height/2);
-      stroke(255,105,0);
-      strokeWeight(1);
-      line((scale * xrel) + width/2, (scale * yrel) + height/2, width/2, height/2);
+      sys.xRel = x - xRef;
+      sys.yRel = y - yRef;
+      sys.zRel = z - zRef;
+      //system population, government & economy
+      sys.population = abs(current.getInt("population"));
+      sys.government = current.get("government").toString();
+      sys.economy = current.get("primary_economy").toString();
+      sys.controllingFaction = current.get("controlling_minor_faction").toString();
+      
+      sys.factions = new MinorFactionPresences(current.getJSONArray("minor_faction_presences"));
+      
+      //success: add system
+      localSystems.add(sys);
     }
   }
+  for(int i=0; i<localSystems.size(); i++){
+        System s = localSystems.get(i);
+        for(int ii=0; ii<s.factions.presences.size(); ii++){
+            FactionPresence p = s.factions.presences.get(ii);
+            for(int iii=0; iii<factionData.size(); iii++){
+              JSONObject f = factionData.getJSONObject(iii);
+              if(p.minorFactionID == f.getInt("id")){
+                p.name = f.get("name").toString();
+                //println("yar");
+              } //else println("nein");
+            }
+        }
+  }
+}
+
+void draw(){
+  clear();
+  System sys = localSystems.get(curSys);
+  showMap();
+  sys.show();
+  
+  //WASD: 119,97,115,100
+  if(keyIndex == 119){
+    curSys = (curSys + 1) % localSystems.size();
+    println("next system: " + (curSys + 1) +"/" + localSystems.size());
+    keyIndex = -1;
+    curFac = 0;
+  }
+  if(keyIndex == 100){
+    curFac = (curFac - 1) % localSystems.get(curSys).factions.presences.size();
+    if(curFac <0) curFac = localSystems.get(curSys).factions.presences.size()-1;
+    println(curFac);
+    println("prev. faction");
+    keyIndex = -1;
+  }
+  if(keyIndex == 115){
+    curSys = (curSys - 1) % localSystems.size();
+    if(curSys <0) curSys = localSystems.size()-1;
+    println(curSys);
+    println("prev. system: " + (curSys + 1) +"/" + localSystems.size());
+    keyIndex = -1;
+    curFac = 0;
+  }
+  if(keyIndex == 100){
+    curFac = (curFac + 1) % localSystems.get(curSys).factions.presences.size();
+    println(curFac);
+    println("next faction");
+    keyIndex = -1;
+  }
+}
+
+class System{
+  String name;
+  float x, y, z;
+  float d;
+  float xRel, yRel, zRel;
+  int population;
+  String government;
+  String economy;
+  String controllingFaction;
+  MinorFactionPresences factions;
+  float o = 20;
+  
+  System(String sysName, float xPos, float yPos, float zPos){
+    name = sysName; x = xPos; y = yPos; z = zPos;
+  }
+  void show(){
+    if(curSys == 5){
+      fill(0,255,0);
+    } else fill(255,105,0);
+
+    text(name.toLowerCase(),xScreen+(0*o), yScreen+(0*o));
+    text(controllingFaction.toLowerCase() + " (contr.)",xScreen+(1*o), yScreen+(1*o));
+    text(government.toLowerCase(),xScreen+(1*o), yScreen+(2*o));
+    text(economy.toLowerCase(),xScreen+(0*o), yScreen+(3*o));
+    text("pop."+population,xScreen+(0*o), yScreen+(4*o));
+    factions.show(xScreen, yScreen);
+  }
+}
+
+class MinorFactionPresences{
+    ArrayList<FactionPresence> presences = new ArrayList<FactionPresence>();
+    float xOff = 0;
+    float yOff = 100;
+    MinorFactionPresences(JSONArray data){
+    for (int i = 0; i < data.size(); i++) {
+      JSONObject cur = data.getJSONObject(i);
+      presences.add(new FactionPresence(cur));
+      }
+    }
+    void show(float x, float y){
+      presences.get(curFac).show(x+xOff,y+yOff);
+    }
+}
+
+class FactionPresence{
+  String name;
+  int minorFactionID;
+  int happinessID;
+  float influence;
+  ArrayList<FactionPresenceState> active = new ArrayList<FactionPresenceState>();
+  ArrayList<FactionPresenceState> pending = new ArrayList<FactionPresenceState>();
+  ArrayList<FactionPresenceState> recovering = new ArrayList<FactionPresenceState>();
+  FactionPresence(JSONObject data){
+          minorFactionID = data.getInt("minor_faction_id");
+          happinessID = data.getInt("happiness_id");
+          influence = data.getFloat("influence");
+          active.add(new FactionPresenceState(data.getJSONArray("active_states")));
+          pending.add(new FactionPresenceState(data.getJSONArray("pending_states")));
+          recovering.add(new FactionPresenceState(data.getJSONArray("recovering_states")));
+      }
+  void show(float x, float y){
+    fill(255,105,0);
+    float o = 20; //offset
+    text(name+" ("+(curFac+1)+"/?"+")",x+o, y);
+    int line = 1;
+    text("inf."+influence,x+(2*o), y+(line*o)); line++;
+    //println("megalodon",active.size(),pending.size(),recovering.size());
+    for(int i=0; i<active.size(); i++){
+      if(!active.get(i).name.equals("None")){
+      text(active.get(i).name.toLowerCase() +" (active)",x+(3*o), y+(line*o)); line ++;
+      } else {
+        text(" no (active) states",x+(2*o), y+(line*o)); line ++;
+      }
+    }
+    text("hap."+happinessID,x+(2*o), y+(line*o)); line++;
+    for(int i=0; i<pending.size(); i++){
+      text(pending.get(i).name +" (pending)",x+(3*o), y+(line*o)); line ++;
+    }
+    for(int i=0; i<recovering.size(); i++){
+      text(recovering.get(i).name +" (recovering)",x+(3*o), y+(line*o)); line ++;
+    }
+  }
+}
+
+class FactionPresenceState{
+  int ID;
+  String name;
+  FactionPresenceState(JSONArray data){
+    for (int i = 0; i < data.size(); i++) {
+          JSONObject cur = data.getJSONObject(i);
+          ID = cur.getInt("id");
+          name = cur.get("name").toString();
+      }
+  }
+}
+
+int keyIndex;
+void keyPressed() {
+  keyIndex = key;
+}
+
+void showMap(){
+  strokeWeight(4);
+  stroke(255,105,0,255);
+  for(int i=0; i<localSystems.size(); i++){
+    float xScreen = (scale * localSystems.get(i).xRel) + 0.3333*width;
+    float yScreen = (scale * localSystems.get(i).yRel) + height/2;
+    //println(xScreen, yScreen);
+    if(i == curSys){
+      strokeWeight(8);
+    } else strokeWeight(4);
+    point(xScreen, yScreen);
+    strokeWeight(1);
+    stroke(255,105,0,50);
+    line(0.3333*width,height/2,xScreen, yScreen);
+  }
+  strokeWeight(1);
+  stroke(255,105,0,100);
+  float xScreenl = (scale * localSystems.get(curSys).xRel) + 0.3333*width;
+  float yScreenl = (scale * localSystems.get(curSys).yRel) + height/2;
+  line(xScreenl, yScreenl, xScreen-10, yScreen-5);
+  fill(0,0);
+  stroke(255,105,0,50);
+  ellipse(0.3333*width,height/2,20,20);
+  ellipse(0.3333*width,height/2,20*scale,20*scale);
+  stroke(255,105,0,100);
+  ellipse(0.3333*width,height/2,20*scale*2,20*scale*2);
+  fill(255,105,0,150);
+  stroke(255,105,0,255);
 }
