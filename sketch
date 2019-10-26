@@ -1,4 +1,4 @@
-// IPXTOOL
+// CARTOLOUNGE
 // cmdr fraichoo oct 3305
 // IPXWING
 
@@ -31,11 +31,12 @@ void setup() {
   float zRef = -67.84375;
   
   //pull data from eddb:
-  //eddb_data = loadJSONArray("https://eddb.io/archive/v6/systems_populated.json");
-  
+  eddb_data = loadJSONArray("https://eddb.io/archive/v6/systems_populated.json");
+  factionData = loadJSONArray("https://eddb.io/archive/v6/factions.json");
+
   //alternatvely if have downladed to a local file (must be in a folder "data"): 
-  eddb_data = loadJSONArray("systems_populated.json");
-  factionData = loadJSONArray("factions.json");
+  //eddb_data = loadJSONArray("systems_populated.json");
+  //factionData = loadJSONArray("factions.json");
   
   for (int i = 0; i < eddb_data.size(); i++) {
     JSONObject current = eddb_data.getJSONObject(i);
@@ -129,7 +130,7 @@ class System{
   void show(){
     fill(50,100,255);
     text(name.toLowerCase(),xScreen+(0*o), yScreen+(0*o));
-    text(controllingFaction.toLowerCase() + " (contr.)",xScreen+(1*o), yScreen+(1*o));
+    text(controllingFaction.toLowerCase(),xScreen+(1*o), yScreen+(1*o));
     text(government.toLowerCase(),xScreen+(1*o), yScreen+(2*o));
     text(economy.toLowerCase(),xScreen+(1*o), yScreen+(3*o));
     text("pop."+population,xScreen+(1*o), yScreen+(4*o));
@@ -173,7 +174,7 @@ class FactionPresence{
     float o = 20; //offset
     text("<  " +name.toLowerCase()+" ("+(curFac+1)+"/" + localSystems.get(curSys).factions.presences.size()+") >",x+(0*o)-17, y);
     int line = 1;
-    text("influence: "+influence,x+(1*o), y+(line*o)); line++;
+    text("influence: "+influence + " %",x+(1*o), y+(line*o)); line++;
     for(int i=0; i<active.size(); i++){
       if(!active.get(i).name.equals("None")){
       text(active.get(i).name.toLowerCase() +" (active)",x+(1*o), y+(line*o)); line ++;
@@ -182,10 +183,18 @@ class FactionPresence{
       }
     }
     for(int i=0; i<pending.size(); i++){
-      text(pending.get(i).name +" (pending)",x+(1*o), y+(line*o)); line ++;
+      if(pending.get(i).name != null){
+      text(pending.get(i).name.toLowerCase() +" (pending)",x+(1*o), y+(line*o)); line ++;
+      } else {
+        text("no (pending) states",x+(1*o), y+(line*o)); line ++;
+      }
     }
     for(int i=0; i<recovering.size(); i++){
-      text(recovering.get(i).name +" (recovering)",x+(1*o), y+(line*o)); line ++;
+      if(recovering.get(i).name != null){
+      text(recovering.get(i).name.toLowerCase() +" (recovering)",x+(1*o), y+(line*o)); line ++;
+      } else {
+        text("no (recovering) states",x+(1*o), y+(line*o)); line ++;
+      }
     }
   }
 }
@@ -216,7 +225,7 @@ void showMap(){
     //println(xScreen, yScreen);
     if(i == curSys){
       strokeWeight(8);
-      stroke(50,100,255);
+      stroke(50,100,255,100);
       fill(50,100,255);
     } else {
       strokeWeight(4);
