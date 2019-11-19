@@ -1,140 +1,448 @@
-// CARTOLOUNGE
-// cmdr fraichoo oct 3305
 // IPXWING
+// LAKON CARTOSUITE
+// cmdr fraichoo oct-nov 3305
 
-//eddb.io API: https://eddb.io/api
 
-JSONArray eddb_data;
-ArrayList<System> localSystems = new ArrayList<System>();
-JSONArray factionData;
-
-float scale = 10;
-
-int curSys = 5;
-int curFac = 4;
-
-float xScreen = 550;
-float yScreen = 150;
-
-float toff = 20;
-
-void setup() {
-  size(800,450); //16:9
-  background(0);
-  stroke(255,105,0,200);
-  fill(255,105,0,150);
-  strokeWeight(4);
-  
-  //coordinates of HIP 2453 (IPX HQ)
-  float xRef = -110.90625;
-  float yRef = 16.5;
-  float zRef = -67.84375;
-  
+//read data from local file or eddb.io
+void read(){
   //pull data from eddb:
-  eddb_data = loadJSONArray("https://eddb.io/archive/v6/systems_populated.json");
-  factionData = loadJSONArray("https://eddb.io/archive/v6/factions.json");
-
-  //alternatvely if have downladed to a local file (must be in a folder "data"): 
+    eddb_data = loadJSONArray("https://eddb.io/archive/v6/systems_populated.json");
+    factionData = loadJSONArray("https://eddb.io/archive/v6/factions.json");
+  //alternatvely: (if have downladed to a local file, must be in a folder "data"): 
   //eddb_data = loadJSONArray("systems_populated.json");
   //factionData = loadJSONArray("factions.json");
-  
-  for (int i = 0; i < eddb_data.size(); i++) {
-    JSONObject current = eddb_data.getJSONObject(i);
-    
-    String name = current.getString("name"); //system name
-    float x = current.getFloat("x"); //system coordinates
-    float y = current.getFloat("y");
-    float z = current.getFloat("z");
-    //derive distance in ly from target (HIP 2453), d:
-    float d = sqrt((x-xRef)*(x-xRef)+(y-yRef)*(y-yRef)+(z-zRef)*(z-zRef));
-        
-    //20ly search radius
-    if(d <= 20.0){
-      System sys = new System(name,x,y,z);
-      sys.d = d;
-      //relative coordinates
-      sys.xRel = x - xRef;
-      sys.yRel = y - yRef;
-      sys.zRel = z - zRef;
-      //system population, government & economy
-      sys.population = abs(current.getInt("population"));
-      sys.government = current.get("government").toString();
-      sys.economy = current.get("primary_economy").toString();
-      sys.controllingFaction = current.get("controlling_minor_faction").toString();
-      
-      sys.factions = new MinorFactionPresences(current.getJSONArray("minor_faction_presences"));
-      
-      //success: add system
-      localSystems.add(sys);
-    }
-  }
-  for(int i=0; i<localSystems.size(); i++){
-        System s = localSystems.get(i);
-        for(int ii=0; ii<s.factions.presences.size(); ii++){
-            FactionPresence p = s.factions.presences.get(ii);
-            for(int iii=0; iii<factionData.size(); iii++){
-              JSONObject f = factionData.getJSONObject(iii);
-              if(p.minorFactionID == f.getInt("id")){
-                p.name = f.get("name").toString();
-                //println("yar");
-              } //else println("nein");
-            }
-        }
-  }
 }
 
+JSONArray eddb_data;
+JSONArray factionData;
+
+ArrayList<System> sysData = new ArrayList<System>();
+IntList locals = new IntList();
+
+ArrayList<FactionFoothold> facData = new ArrayList<FactionFoothold>();
+ArrayList<FactionSpread> facSpread = new ArrayList<FactionSpread>();
+
+boolean guest = false;
+
+int curSys = 0;  
+int curSys_local = 0;
+
+int curFac = 0;
+
+float xHQ = -110.90625;
+float yHQ = 16.5;
+float zHQ = -67.84375;
+
+float o = 20;
+
+float xSysInfo;
+float ySysInfo;
+
+float xFacInfo;
+float yFacInfo;
+
+
+
+//******************************* GLOBALS ****************************************
+//                             **************
+
+//border
+float border_x = 55;
+float border_y = 55;
+float border_w;
+float border_h;
+
+//system HUD
+float sysHUD_dim;
+float sysHUD_xmid;
+float sysHUD_ymid;
+
+//search radius
+float sysRadius_data = 40;
+float sysRadius_HUD = 20;
+
+//scaling
+float sysScale_lo;
+float sysScale_hi;
+
+int keyIndex;
+int mode = -1;
+
+//                             **************
+//*****************************************************************************
+//***************************** SETUP / DRAW ****************************************
+//                             **************
+
+//main setup() function
+void setup(){
+  fullScreen();
+  background(40,20,30,255);
+  textSize(16);
+  stroke(white_lo);
+  
+  //setup screen width & height
+  border_w = width - (border_x * 2);
+  border_h = height - (border_y * 2);
+  
+  //setup systems HUD
+  sysHUD_dim = border_h;
+  sysHUD_xmid = (sysHUD_dim/2) + border_x; 
+  sysHUD_ymid = (sysHUD_dim/2) + border_y;
+  sysScale_lo = (sysHUD_dim/2)/sysRadius_data;
+  sysScale_hi = (sysHUD_dim/2)/sysRadius_HUD;
+  
+  xSysInfo = sysHUD_xmid + (sysHUD_dim/2) + 10;
+  ySysInfo = (height / 2);
+  
+  xFacInfo = xSysInfo;
+  yFacInfo = ySysInfo;
+  
+  read();
+  parse();
+}
+
+//main draw() function
 void draw(){
   clear();
-  System sys = localSystems.get(curSys);
-  showMap();
-  sys.show();
-  
-  //WASD: 119,97,115,100
-  if(keyIndex == 119){
-    curSys = (curSys + 1) % localSystems.size();
-    keyIndex = -1;
-    curFac = 0;
+  getInput();
+  draw_suite();
+}
+
+//                             **************
+//******************************** GLOBAL *************************************
+//**************************** DRAW FUNCTIONS *********************************
+//                             **************
+
+void draw_suite(){
+  draw_HUD();
+  draw_systems();
+  draw_factions();
+}
+
+void draw_HUD(){
+  draw_border();
+  draw_logos();
+  draw_info();
+  draw_key();
+  draw_mapArea();
+}
+
+void draw_border(){
+  strokeWeight(1); stroke(white_hi); noFill(); rectMode(CORNER);
+  rect(5,5,width-10,height-10);
+}
+
+void draw_logos(){
+  textSize(24); fill(white_hi); 
+  text("LAKON cartosuite",20,40);
+}
+
+void draw_info(){
+  strokeWeight(1); stroke(white_hi); fill(white_hi); textSize(16);
+  String m = "";
+  if(mode == -1) {m = "hi";}
+  if(mode == 1) {m = "lo";}
+  text("zoom mode: " + m, 20, 60);
+}
+
+void draw_key(){
+  textSize(16);
+  fill(orange_lo); text("■ none",20,80);
+  fill(blue_lo); text("■ PMF",20,100);
+  fill(green_lo); text("■ IPX",20,120);
+  fill(yellow_lo); text("■ PMF<>PMF",20,140);
+  fill(red_lo); text("■ IPX<>PMF",20,160);
+}
+
+void draw_mapArea(){
+  strokeWeight(1); stroke(white_lo); noFill();
+  if(mode == -1){
+    ellipse(sysHUD_xmid,sysHUD_ymid,10,10);
+    ellipse(sysHUD_xmid,sysHUD_ymid,sysHUD_dim/2,sysHUD_dim/2);
+    ellipse(sysHUD_xmid,sysHUD_ymid,sysHUD_dim,sysHUD_dim);
   }
-  if(keyIndex == 97){
-    curFac = (curFac - 1) % localSystems.get(curSys).factions.presences.size();
-    if(curFac <0) curFac = localSystems.get(curSys).factions.presences.size()-1;
-     keyIndex = -1;
+  if(mode == 1){
+    ellipse(sysHUD_xmid,sysHUD_ymid,10,10);
+    ellipse(sysHUD_xmid,sysHUD_ymid,sysHUD_dim/2,sysHUD_dim/2);
+    ellipse(sysHUD_xmid,sysHUD_ymid,sysHUD_dim,sysHUD_dim);
+    ellipse(sysHUD_xmid,sysHUD_ymid,sysHUD_dim,sysHUD_dim);
   }
-  if(keyIndex == 115){
-    curSys = (curSys - 1) % localSystems.size();
-    if(curSys <0) curSys = localSystems.size()-1;
-    keyIndex = -1;
-    curFac = 0;
+  float x = sysHUD_xmid + (sysHUD_dim/2);
+  float y = height/2; 
+  line(x,y,x+50,y);
+}
+
+void draw_systems(){
+  if(mode == -1) draw_local();
+  if(mode == 1) draw_all();
+}
+
+void draw_local(){
+  for(int i=0; i<locals.size(); i++){
+    boolean draw = true;
+    boolean label = true;
+    boolean connect = true;
+    System s = sysData.get(locals.get(i)); 
+    strokeWeight(1); stroke(s.indCol_lo); fill(s.indCol_lo);
+    float x = s.x;
+    float y = s.y;
+    float d = sqrt((x)*(x)+(y)*(y));
+    if(d > sysRadius_data/2) {draw = false; label = false; connect = false;}
+    x *= sysScale_hi;
+    y *= sysScale_hi;
+    x += sysHUD_xmid;
+    y += sysHUD_ymid;
+    strokeWeight(6);
+    if(i == curSys_local && !guest) {
+      s.show();
+      strokeWeight(1); stroke(white_lo);
+      line(x,y,sysHUD_xmid + (sysHUD_dim/2),height/2);
+    }
+    if(draw){
+      strokeWeight(6); stroke(s.indCol_hi);
+      if(i == curSys_local && !guest) {strokeWeight(10); stroke(white_hi);}
+      point(x,y);
+    }
+    if(label){
+      if(i == curSys_local){
+        strokeWeight(1); stroke(white_hi); fill(white_hi);
+        if(guest) strokeWeight(1); stroke(s.indCol_hi); fill(s.indCol_hi);
+      } else {
+        strokeWeight(1); stroke(s.indCol_hi); fill(s.indCol_hi);
+      }
+      text(s.sysName,x,y);
+    }
+    if(connect) {
+      if(i == curSys_local){
+        strokeWeight(1); stroke(white_hi); fill(white_hi);
+        if(guest) strokeWeight(1); stroke(s.indCol_lo); fill(s.indCol_lo);
+      } else {
+        strokeWeight(1); stroke(s.indCol_hi); fill(s.indCol_hi);
+      }
+      line(sysHUD_xmid,sysHUD_ymid,x,y);
+    }
   }
-  if(keyIndex == 100){
-    curFac = (curFac + 1) % localSystems.get(curSys).factions.presences.size();
-    keyIndex = -1;
+  if(guest){
+    System s = sysData.get(curSys); 
+    float x = s.x;
+    float y = s.y;
+    float d = sqrt((x)*(x)+(y)*(y));
+    float xu = x/d;
+    float yu = y/d;
+    x =  xu * sysRadius_HUD;
+    y =  yu * sysRadius_HUD;
+    x *= sysScale_hi;
+    y *= sysScale_hi;
+    x += sysHUD_xmid;
+    y += sysHUD_ymid;
+    strokeWeight(10); stroke(white_hi); fill(white_hi);
+    point(x,y);
+    text(s.sysName,x,y);
+    strokeWeight(1); stroke(white_hi); fill(white_hi);
+    line(sysHUD_xmid,sysHUD_ymid,x,y);
+    strokeWeight(1); stroke(white_lo); fill(white_lo);
+    line(x,y,sysHUD_xmid + (sysHUD_dim/2),height/2);
+    s.show();
+  } 
+}
+
+void draw_all(){
+  for(int i=0; i<sysData.size(); i++){  
+    boolean draw = true;
+    boolean label = true;
+    boolean connect = true;
+    System s = sysData.get(i); 
+    if(!s.isLocal) connect = false;
+    float x = s.x;
+    float y = s.y;
+    x *= sysScale_lo;
+    y *= sysScale_lo;
+    x += sysHUD_xmid;
+    y += sysHUD_ymid;
+    if(i == curSys) {
+      strokeWeight(1); stroke(white_lo); fill(white_lo); 
+      connect = true; 
+      s.show();
+      line(x,y,sysHUD_xmid + (sysHUD_dim/2),height/2);
+    }
+     if(draw){
+      strokeWeight(6); stroke(s.indCol_hi);
+      if(i == curSys) {strokeWeight(10); stroke(white_hi);}
+      point(x,y);
+    }
+    if(label){
+      strokeWeight(1); stroke(s.indCol_hi); fill(s.indCol_hi); 
+      if(i == curSys)fill(white_hi);
+      text(s.sysName,x,y);
+    }
+    strokeWeight(1);
+    if(connect) {
+      strokeWeight(1); stroke(s.indCol_hi); fill(s.indCol_hi); 
+      if(i == curSys)fill(white_hi);
+      line(sysHUD_xmid,sysHUD_ymid,x,y);
+    }
   }
 }
 
+void draw_factions(){
+  if(mode == 1){
+    strokeWeight(1); stroke(white_mid); noFill();
+    String sysNam = sysData.get(curSys).sysName;
+    int sysRef = sysData.get(curSys).sysID;
+    String facNam = sysData.get(curSys).factions.presences.get(curFac).name;
+    int facRef = sysData.get(curSys).factions.presences.get(curFac).minorFactionID;
+  
+    for(int i=0; i<facData.size(); i++){
+      FactionFoothold f = facData.get(i);
+      if(f.minorFactionID == facRef) {
+         float x,y;
+         x = f.x;
+         y = f.y;
+         x *= sysScale_lo;
+         y *= sysScale_lo;
+         x += sysHUD_xmid;
+         y += sysHUD_ymid;
+         ellipse(x,y,20,20);
+      } 
+     }
+  } else {
+    strokeWeight(1); stroke(white_mid); noFill();
+    System s;
+    if(guest){
+      s = sysData.get(curSys);
+    } else {
+      s = sysData.get(locals.get(curSys_local));
+    }
+    String sysNam = s.sysName;
+    String facNam = s.factions.presences.get(curFac).name.toLowerCase();
+    int facRef = s.factions.presences.get(curFac).minorFactionID;
+    
+    if(!guest || guest){
+      for(int i=0; i<facData.size(); i++){
+        FactionFoothold f = facData.get(i);
+        if(f.minorFactionID == facRef) {
+           float x,y,z;
+           x = f.x;
+           y = f.y;
+           z = f.z;
+           float d = sqrt((x)*(x)+(y)*(y)+(z)*(z));
+           if(d > sysRadius_HUD){
+             d = sqrt((x)*(x)+(y)*(y));
+             float xu = x/d;
+             float yu = y/d;
+             x =  xu * sysRadius_HUD;
+             y =  yu * sysRadius_HUD;
+             x *= sysScale_hi;
+             y *= sysScale_hi;
+             x += sysHUD_xmid;
+             y += sysHUD_ymid;
+             strokeWeight(8); stroke(white_lo); noFill();
+             point(x,y);
+             strokeWeight(1); stroke(white_lo); noFill();
+             ellipse(x,y,20,20);
+             strokeWeight(1); stroke(white_lo); fill(white_lo);
+             text(facNam,x,y);
+           } else {
+               x *= sysScale_hi;
+               y *= sysScale_hi;
+               x += sysHUD_xmid;
+               y += sysHUD_ymid;
+               strokeWeight(1); stroke(white_mid); noFill();
+               ellipse(x,y,20,20);
+           }
+        } 
+      }
+    }
+  }
+}
+//                             **************
+//*****************************************************************************
+//******************************** CLASSES ************************************
+//                             **************
+
 class System{
-  String name;
-  float x, y, z;
-  float d;
-  float xRel, yRel, zRel;
+  int sysID; 
+  String sysName; 
+  float x, y, z, d; 
+  int PMFCount = 0; 
   int population;
   String government;
   String economy;
-  String controllingFaction;
   MinorFactionPresences factions;
-  float o = 20;
-  
-  System(String sysName, float xPos, float yPos, float zPos){
-    name = sysName; x = xPos; y = yPos; z = zPos;
+  String controllingFaction;
+  boolean hasPMF = false;
+  boolean isLocal = true;
+  boolean hasMinorFaction = false;
+  boolean CMFisPMF = false;
+  boolean hasIPX = false;
+  color indCol_lo = white_lo;
+  color indCol_hi = white_hi;
+  System(String nameVal, float xVal, float yVal, float zVal){
+    sysName = nameVal;
+    x = xVal;
+    y = yVal;
+    z = zVal;
+    d = sqrt((x)*(x)+(y)*(y));
+    if(d>=sysRadius_HUD) isLocal = false; 
+  }
+  void inspect(){
+    for(int i=0 ; i<factions.presences.size(); i++){
+      FactionPresence f = factions.presences.get(i);
+      if(f.isPMF) PMFCount += 1;
+      if(f.name.equals("Interplanetary Explorations")) {hasIPX = true;}
+    }
+    if(!hasPMF){
+      indCol_lo = orange_lo; indCol_hi = orange_hi;
+    } else if(hasIPX){
+       if(PMFCount == 1) {indCol_lo = green_lo; indCol_hi = green_hi;} else {indCol_lo = red_lo; indCol_hi = red_hi;}
+    } else if(PMFCount >1){
+       indCol_lo = yellow_lo; indCol_hi = yellow_hi;
+    } else {indCol_lo = blue_lo; indCol_hi = blue_hi;}
+    exportFacData();
   }
   void show(){
-    fill(50,100,255);
-    text(name.toLowerCase(),xScreen+(0*o), yScreen+(0*o));
-    text(controllingFaction.toLowerCase(),xScreen+(1*o), yScreen+(1*o));
-    text(government.toLowerCase(),xScreen+(1*o), yScreen+(2*o));
-    text(economy.toLowerCase(),xScreen+(1*o), yScreen+(3*o));
-    text("pop."+population,xScreen+(1*o), yScreen+(4*o));
-    factions.show(xScreen, yScreen);
+    fill(indCol_hi);
+    text(sysName.toLowerCase(),xSysInfo+(0*o), ySysInfo+(0*o));
+    text(controllingFaction.toLowerCase(),xSysInfo+(1*o), ySysInfo+(1*o));
+    text(government.toLowerCase(),xSysInfo+(1*o), ySysInfo+(2*o));
+    text(economy.toLowerCase(),xSysInfo+(1*o), ySysInfo+(3*o));
+    text("pop."+population,xSysInfo+(1*o), ySysInfo+(4*o));
+    factions.show(xFacInfo, yFacInfo);
+  }
+  void exportFacData(){
+    for(int i=0 ; i<factions.presences.size(); i++){
+      FactionPresence f = factions.presences.get(i);
+      FactionFoothold fh = new FactionFoothold();
+      fh.sysName = sysName;
+      fh.x = x;
+      fh.y = y;
+      fh.z = z;
+      fh.d = d;
+      fh.facName = f.name;
+      fh.minorFactionID = f.minorFactionID;
+      facData.add(fh);
+    }
+    for(int i=0 ; i<facData.size(); i++){
+      boolean nu = true;
+      int matches = -1;
+      FactionFoothold f = facData.get(i);
+      for(int j=0 ; j<facSpread.size(); j++){
+        if(f.minorFactionID == facSpread.get(j).minorFactionID){
+          nu = false;
+          matches = j;
+        } 
+      }
+      if(nu){
+        FactionSpread s = new FactionSpread();
+        s.facName = f.facName;
+        s.minorFactionID = f.minorFactionID;
+        s.presences.add(f);
+        facSpread.add(s);
+      } else{
+        FactionSpread s = facSpread.get(matches);
+        s.presences.add(f);
+      }
+    }
   }
 }
 
@@ -149,11 +457,12 @@ class MinorFactionPresences{
       }
     }
     void show(float x, float y){
-      presences.get(curFac).show(x+xOff,y+yOff);
+      presences.get(curFac).show(xSysInfo,ySysInfo+(5*o));
     }
 }
 
 class FactionPresence{
+  boolean isPMF;
   String name;
   int minorFactionID;
   int happinessID;
@@ -170,9 +479,10 @@ class FactionPresence{
           recovering.add(new FactionPresenceState(data.getJSONArray("recovering_states")));
       }
   void show(float x, float y){
-    fill(255,105,0);
-    float o = 20; //offset
-    text("<  " +name.toLowerCase()+" ("+(curFac+1)+"/" + localSystems.get(curSys).factions.presences.size()+") >",x+(0*o)-17, y);
+    fill(orange_lo);
+    if(isPMF) fill(blue_lo);
+    if(minorFactionID == 76554)fill(green_lo);
+    text("<  " +name.toLowerCase()+" ("+(curFac+1)+"/" + sysData.get(curSys).factions.presences.size()+") >",x+(0*o)-17, y);
     int line = 1;
     text("influence: "+influence + " %",x+(1*o), y+(line*o)); line++;
     for(int i=0; i<active.size(); i++){
@@ -211,45 +521,142 @@ class FactionPresenceState{
   }
 }
 
-int keyIndex;
-void keyPressed() {
-  keyIndex = key;
+class FactionFoothold{
+  String facName;
+  int minorFactionID;
+  String sysName;
+  float x, y, z, d;
 }
 
-void showMap(){
-  strokeWeight(4);
-  stroke(255,105,0,255);
-  for(int i=0; i<localSystems.size(); i++){
-    float xScreen = (scale * localSystems.get(i).xRel) + 0.3333*width;
-    float yScreen = (scale * localSystems.get(i).yRel) + height/2;
-    //println(xScreen, yScreen);
-    if(i == curSys){
-      strokeWeight(8);
-      stroke(50,100,255,100);
-      fill(50,100,255);
-    } else {
-      strokeWeight(4);
-      stroke(255,105,0,255);
-      fill(255,105,0,255);
-    }
-    point(xScreen, yScreen);
-    text(localSystems.get(i).name.toLowerCase(),xScreen+5, yScreen-5);
-    strokeWeight(1);
-    stroke(255,105,0,50);
-    line(0.3333*width,height/2,xScreen, yScreen);
-  }
-  strokeWeight(1);
-  stroke(255,105,0,100);
-  float xScreenl = (scale * localSystems.get(curSys).xRel) + 0.3333*width;
-  float yScreenl = (scale * localSystems.get(curSys).yRel) + height/2;
-  stroke(50,100,255);
-  line(xScreenl, yScreenl, xScreen-10, yScreen-5);
-  fill(0,0);
-  stroke(255,105,0,50);
-  ellipse(0.3333*width,height/2,20,20);
-  ellipse(0.3333*width,height/2,20*scale,20*scale);
-  stroke(255,105,0,100);
-  ellipse(0.3333*width,height/2,20*scale*2,20*scale*2);
-  fill(255,105,0,150);
-  stroke(255,105,0,255);
+class FactionSpread{
+  String facName;
+  int minorFactionID;
+  ArrayList<FactionFoothold> presences = new ArrayList<FactionFoothold>();
 }
+
+//                             **************
+//*****************************************************************************
+//******************************** INPUT **************************************
+//                             **************
+
+void keyPressed() {
+  if (key == CODED) {
+    if (keyCode == UP) {keyIndex = 1000;} 
+      else if (keyCode == DOWN) {keyIndex = 1001;}
+        else if (keyCode == LEFT) {keyIndex = 2000;}
+          else if (keyCode == RIGHT) {keyIndex = 2001;}
+  } else {keyIndex = key;}
+}
+void getInput(){
+  if(keyIndex == 1000){
+    if(mode == -1) curSys_local = (curSys_local + 1) % locals.size();
+    if(mode == 1) curSys = (curSys + 1) % sysData.size();
+    guest = false;
+    curFac = 0;
+  }
+  if(keyIndex == 1001){
+    if(mode == -1) {
+      if(curSys_local == 0){curSys_local = locals.size()-1;}
+      else {curSys_local = (curSys_local - 1) % locals.size();}
+    }
+    if(mode == 1){
+      if(curSys == 0){curSys = sysData.size()-1;}
+      else {curSys = (curSys - 1) % sysData.size();}
+    }
+    guest = false;
+    curFac = 0;
+  }
+  if(keyIndex == 2000){
+    int range = sysData.get(curSys).factions.presences.size();
+    if(curFac == 0) {curFac = range -1;} 
+      else {curFac = (curFac - 1) % range;}
+  }
+  if(keyIndex == 2001){
+    int range = sysData.get(curSys).factions.presences.size();
+    curFac = (curFac + 1) % range;
+  }
+  if(keyIndex == 32){
+    if(mode == -1){
+      if(!guest) {curSys = locals.get(curSys_local);} 
+    } else{
+      if(sysData.get(curSys).isLocal){
+        for(int i=0; i<locals.size(); i++){
+          if(locals.get(i) == curSys) {curSys_local = i;}
+        }
+        guest = false;
+      } else {
+          guest = true;
+      }
+    }
+    mode *= -1;
+  }
+  keyIndex = -1;
+}
+
+//                             **************
+//*****************************************************************************
+//****************************** DATA IMPORT *************************************
+//                             **************
+
+void parse(){
+  for (int i = 0; i < eddb_data.size(); i++) {
+    JSONObject current = eddb_data.getJSONObject(i);
+    String name = current.getString("name");
+    float x = current.getFloat("x"); 
+    float y = current.getFloat("y");
+    float z = current.getFloat("z");
+    float d = sqrt((x-xHQ)*(x-xHQ)+(y-yHQ)*(y-yHQ)+(z-zHQ)*(z-zHQ));
+    if(d <= sysRadius_data){
+      System nu = new System(name.toLowerCase(),x,y,z);
+      nu.sysID = current.getInt("id");
+      nu.d = d;
+      if(d <= sysRadius_HUD) nu.isLocal = true;
+      nu.x = x - xHQ;
+      nu.y = y - yHQ;
+      nu.z = z - zHQ;
+      nu.population = abs(current.getInt("population"));
+      nu.government = current.get("government").toString();
+      nu.economy = current.get("primary_economy").toString();
+      nu.controllingFaction = current.get("controlling_minor_faction").toString();
+      nu.factions = new MinorFactionPresences(current.getJSONArray("minor_faction_presences"));
+      for(int ii=0; ii<nu.factions.presences.size(); ii++){
+        FactionPresence p = nu.factions.presences.get(ii);
+        for(int iii=0; iii<factionData.size(); iii++){
+          JSONObject f = factionData.getJSONObject(iii);
+          if(p.minorFactionID == f.getInt("id")){
+            p.name = f.get("name").toString();
+            p.isPMF = f.getBoolean("is_player_faction");
+            if(p.isPMF) nu.hasPMF = true;
+            if(p.isPMF && p.name.equals(nu.controllingFaction)) nu.CMFisPMF = true;
+          }
+        }
+      }
+      nu.inspect();
+      sysData.add(nu);
+    }
+  }
+  for(int i=0; i<sysData.size(); i++){
+    if(sysData.get(i).isLocal) locals.append(i);
+  }
+}
+
+//******************************* COLOUR ****************************************
+//                             **************
+
+int loVal = 180;
+
+color white_lo = color(255,255,255,140);
+color orange_lo = color(240,80,60,loVal);
+color green_lo = color(120,190,40,loVal);
+color yellow_lo = color(250,200,50,loVal);
+color red_lo = color(255,30,30,loVal);
+color blue_lo = color(100,100,255,loVal);
+
+color white_mid = color(255,255,255,200);
+
+color white_hi = color(255,255,255,255);
+color orange_hi = color(240,80,60,255);
+color green_hi = color(120,190,40,255);
+color yellow_hi = color(250,200,50,255);
+color red_hi = color(250,30,30,255);
+color blue_hi = color(100,100,255,255);
